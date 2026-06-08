@@ -6073,7 +6073,16 @@ export class LcmContextEngine implements ContextEngine {
 
         // Match the same occurrence index as the DB tail so repeated empty
         // tool messages do not anchor against a later, still-missing entry.
-        if (dbCountForIdentity !== occurrencesThroughIndex) {
+        // Use < (not !==) so that excess DB copies from historical duplicates
+        // do not prevent anchoring. When dbCount >= occurrencesThroughIndex
+        // the DB already knows about all occurrences visible at this index.
+        // However, when the candidate is at the very tip of the transcript
+        // and dbCount exceeds occurrencesThroughIndex, the excess copies may
+        // be historical artifacts — don't anchor at the tip in that case.
+        if (dbCountForIdentity < occurrencesThroughIndex) {
+          continue;
+        }
+        if (dbCountForIdentity > occurrencesThroughIndex && index === storedHistoricalMessages.length - 1) {
           continue;
         }
 
@@ -8187,6 +8196,7 @@ export class LcmContextEngine implements ContextEngine {
       const model =
         typeof topLevel.model === "string" ? topLevel.model.trim() : "";
       if (provider === "openclaw" && model === "delivery-mirror") {
+        this.deps.log.warn(`[lcm] ingestSingle SKIPPING delivery-mirror message`);
         return { ingested: false };
       }
     }

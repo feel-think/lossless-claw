@@ -6965,6 +6965,26 @@ export class LcmContextEngine implements ContextEngine {
       }
     }
 
+    // /new 命令会将旧会话文件重命名为 .reset.<timestamp>.jsonl，
+    // 如果目录中存在此类文件则说明是正常的 /new 生命周期，不应触发 conversation 替换。
+    try {
+      const { readdirSync } = await import("node:fs");
+      const sessionDir = trackedSessionFile.substring(0, trackedSessionFile.lastIndexOf("/"));
+      const oldStem = trackedSessionFile.substring(trackedSessionFile.lastIndexOf("/") + 1);
+      const siblings = readdirSync(sessionDir);
+      const hasResetMarker = siblings.some(
+        (name) => name.startsWith(oldStem) && name.includes(".reset."),
+      );
+      if (hasResetMarker) {
+        this.deps.log.info(
+          `[lcm] ${params.phase}: detected .reset. sibling for conversation=${activeByKey.conversationId}, skipping rotation (likely /new lifecycle)`,
+        );
+        return false;
+      }
+    } catch (_) {
+      // readdirSync 可能因权限等原因失败，此时继续原有逻辑
+    }
+
     this.deps.log.warn(
       `[lcm] ${params.phase}: detected reset/rollover without prior lifecycle split; rotating conversation=${activeByKey.conversationId} session=${params.sessionId} sessionKey=${normalizedSessionKey} oldSessionId=${activeByKey.sessionId} oldFile=${trackedSessionFile}${params.sessionFile ? ` newFile=${params.sessionFile}` : ""}`,
     );

@@ -8177,6 +8177,18 @@ export class LcmContextEngine implements ContextEngine {
           return { ingested: false };
         }
       }
+
+      // Skip OpenClaw delivery-mirror assistant messages. These are
+      // channel-delivery transcript records (what was actually sent to
+      // the user), not model output. Ingesting them causes duplicate
+      // assistant content in both compaction and context assembly.
+      const provider =
+        typeof topLevel.provider === "string" ? topLevel.provider.trim() : "";
+      const model =
+        typeof topLevel.model === "string" ? topLevel.model.trim() : "";
+      if (provider === "openclaw" && model === "delivery-mirror") {
+        return { ingested: false };
+      }
     }
 
     let stored = toStoredMessage(message);
